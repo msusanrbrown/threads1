@@ -1,33 +1,141 @@
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
+#include<stdio.h>
+#include<stdlib.h>
+#include<pthread.h>
 
-# Precompiled Headers
-*.gch
-*.pch
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
+void *PIcomp(void*threadID); 
+ 
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
+double gpie=0;  //global variable to store partial sum
+   
+int T;  //number of threads
 
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
+int N;   //number of partial sums
 
-# Debug files
-*.dSYM/
-*.su
+pthread_mutex_t locksum; //mutex global variable
+
+
+int main(int argc, char*argv[])
+
+{
+	double pibase=3.0;
+
+	printf("Starting multithreading program piesync.c\n\n");
+
+
+	if (argc!=3)  //error checking for number of parameters
+	{
+		printf("Invalid number of arguments\n");
+		exit (1);
+	}
+
+	N=atoi(argv[1]);
+
+	T=atoi(argv[2]);
+
+
+	if (N<T)  //error checking for N>T
+	{
+		printf("Invalid parameters\n");
+		exit(1);
+	}
+	
+	int i;
+
+	
+	pthread_mutex_init(&locksum, NULL);  //initializing mutex
+
+	pthread_t *tid=(pthread_t*)malloc(T*sizeof(pthread_t)); 
+	
+	int rc;
+	
+	long t;
+
+	for (t=0; t<T; t++)  //creating threads
+	{
+		rc=pthread_create(&tid[t], NULL, PIcomp, (void*)t);
+		
+		if (rc!=0)  //error checking
+		{
+			printf("Error: Threads not created\n");
+
+			exit(1);
+		}
+	
+	}
+
+
+
+	for (i=0; i<T; i++)   //waiting for threads to terminate
+	{
+		rc=pthread_join(tid[i], NULL);
+
+		if (rc!=0)  //error checking
+		{
+			printf("Error: Return code from pthread_join() is %d\n", rc); 
+
+			exit(1);
+		}
+	}
+	
+	 
+
+    	pthread_mutex_destroy(&locksum);  //destroying pthread_mutex
+
+	gpie=gpie+pibase;  //computing final value of gpie
+
+	printf("Pi computed with %d terms in %d threads is %f\n", N, T, gpie);
+
+	free(tid);  //releasing memory
+
+	pthread_exit((void*) 0);
+
+	return 0;
+
+	}
+
+
+	
+
+
+	void *PIcomp (void*threadID)
+	{
+
+		
+	  int i;
+		int k;
+
+		long tid=(long)threadID;
+
+		int j=(int)tid;
+
+		int lowerB=(N/T)*j;	//defining upper and lower bound
+		int upperB=(N/T)*(j+1)-1;
+
+		if(lowerB==0)  //checking for lowerB!=0
+
+			lowerB++;
+
+
+		for (i=lowerB; i<upperB; i++)
+		{
+			if(i%2==0)
+				k=-1;
+			else
+				k=1;
+
+			pthread_mutex_lock (&locksum);		//lock  (c.s.)
+
+			//updating gpie value
+
+			gpie = gpie + (k*4.0)/((2.0*i)*(2.0*i+1.0)*(2.0*i+2.0));  
+
+			pthread_mutex_unlock (&locksum);		//unlock	
+			
+		}
+
+
+		pthread_exit(0);
+	}
+
+
